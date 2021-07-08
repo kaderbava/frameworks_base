@@ -51,6 +51,7 @@ import android.os.Process;
 import android.os.ServiceManager;
 import android.os.UserHandle;
 import android.os.UserManager;
+import android.provider.Settings;
 import android.security.Credentials;
 import android.text.TextUtils;
 import android.util.Log;
@@ -72,6 +73,8 @@ import java.util.ArrayList;
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.util.List;
+
+import org.derpfest.providers.DerpFestSettings;
 
 /**
  * Service that tracks and manages VPNs, and backs the VpnService and VpnManager APIs.
@@ -912,6 +915,12 @@ public class VpnManagerService extends IVpnManager.Stub {
             }
 
             vpn.refreshPlatformVpnAppExclusionList();
+
+            if (TextUtils.equals(vpn.getPackage(), packageName) && userId == UserHandle.USER_SYSTEM
+                    && vpn.isGlobalVpn()) {
+                Settings.Global.putString(mContext.getContentResolver(),
+                        DerpFestSettings.Global.GLOBAL_VPN_APP, "");
+            }
         }
     }
 
