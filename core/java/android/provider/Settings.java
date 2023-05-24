@@ -12852,6 +12852,12 @@ public final class Settings {
         public static final String NETWORK_TRAFFIC_SHOW_UNITS = "network_traffic_show_units";
 
         /**
+         * Whether to show ambient instead of waking for the tap gesture
+         * @hide
+         */
+        public static final String DOZE_SINGLE_TAP_GESTURE_AMBIENT = "doze_single_tap_gesture_ambient";
+
+        /**
          * Whether to show daily data usage in the QS footer.
          * @hide
          */
