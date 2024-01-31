@@ -75,4 +75,10 @@
     <!-- Text to use when the number in a notification info is too large -->
     <!-- Name of the roaming status bar icon. -->
     <string name="status_bar_roaming">Hinweis auf Roaming</string>
+
+    <!-- Name of the HD calling status bar icon. -->
+    <string name="status_bar_hd_calling">HD-Anruf (VoLTE/VoNR)</string>
+
+    <!-- Name of the VoWiFi status bar icon. -->
+    <string name="status_bar_vowifi">WLAN-Anruf (VoWiFi)</string>
 </resources>
