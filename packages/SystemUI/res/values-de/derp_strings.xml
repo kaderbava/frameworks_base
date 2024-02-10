@@ -71,4 +71,8 @@
         <item quantity="one">%d Gerät verbunden</item>
         <item quantity="other">%d Geräte verbunden</item>
     </plurals>
+
+    <!-- Text to use when the number in a notification info is too large -->
+    <!-- Name of the roaming status bar icon. -->
+    <string name="status_bar_roaming">Hinweis auf Roaming</string>
 </resources>
