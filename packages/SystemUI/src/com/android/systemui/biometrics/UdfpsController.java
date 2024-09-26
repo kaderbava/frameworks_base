@@ -891,21 +891,25 @@ public class UdfpsController implements DozeReceiver, Dumpable {
         mAmbientDisplayConfiguration = new AmbientDisplayConfiguration(mContext);
         boolean screenOffFodSupported = mContext.getResources().getBoolean(
                 com.android.internal.R.bool.config_supportsScreenOffUdfps);
-        if (screenOffFodSupported) {
-            mScreenOffFod = mSecureSettings.getIntForUser(
-                Settings.Secure.SCREEN_OFF_UDFPS_ENABLED, 0, UserHandle.USER_CURRENT) == 1;
-            mSecureSettings.registerContentObserver(Settings.Secure.SCREEN_OFF_UDFPS_ENABLED,
-                new ContentObserver(mainHandler) {
-                    @Override
-                    public void onChange(boolean selfChange, Uri uri) {
-                        if (uri.getLastPathSegment().equals(Settings.Secure.SCREEN_OFF_UDFPS_ENABLED)) {
-                            mScreenOffFod = mSecureSettings.getIntForUser(
-                                Settings.Secure.SCREEN_OFF_UDFPS_ENABLED, 0, UserHandle.USER_CURRENT) == 1;
-                        }
-                    }
-                }
-            );
-        }
+	if (screenOffFodSupported) {
+	    mScreenOffFod = mSecureSettings.getIntForUser(
+		Settings.Secure.SCREEN_OFF_UDFPS_ENABLED, 0, UserHandle.USER_CURRENT) == 1;
+
+	    // Use getContentResolver() to register the ContentObserver
+	    mContext.getContentResolver().registerContentObserver(
+		Settings.Secure.getUriFor(Settings.Secure.SCREEN_OFF_UDFPS_ENABLED),
+		false, // Notify for descendants
+		new ContentObserver(mainHandler) {
+		    @Override
+		    public void onChange(boolean selfChange, Uri uri) {
+			if (uri.getLastPathSegment().equals(Settings.Secure.SCREEN_OFF_UDFPS_ENABLED)) {
+			    mScreenOffFod = mSecureSettings.getIntForUser(
+				Settings.Secure.SCREEN_OFF_UDFPS_ENABLED, 0, UserHandle.USER_CURRENT) == 1;
+                	}
+            	    }
+        	}
+    	    );
+	}
 
         updateUdfpsAnimation();
         mConfigurationController.addCallback(mConfigurationListener);
