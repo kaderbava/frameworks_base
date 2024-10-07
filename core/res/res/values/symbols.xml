@@ -4767,6 +4767,9 @@
   <!-- Set to true to enable letterboxing on translucent activities. -->
   <java-symbol type="bool" name="config_letterboxIsEnabledForTranslucentActivities" />
 
+  <!-- Whether devices suports in-display fingerprint when screen is off -->
+  <java-symbol type="bool" name="config_supportsScreenOffUdfps" />
+
   <!-- Whether per-app user aspect ratio override settings is enabled -->
   <java-symbol type="bool" name="config_appCompatUserAppAspectRatioSettingsIsEnabled" />
   <java-symbol type="bool" name="config_appCompatUserAppAspectRatioFullscreenIsEnabled" />
