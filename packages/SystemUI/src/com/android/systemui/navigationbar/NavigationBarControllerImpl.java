@@ -27,6 +27,7 @@ import android.hardware.display.DisplayManager;
 import android.os.Bundle;
 import android.os.RemoteException;
 import android.os.Trace;
+import android.os.UserHandle;
 import android.util.Log;
 import android.util.SparseArray;
 import android.util.SparseBooleanArray;

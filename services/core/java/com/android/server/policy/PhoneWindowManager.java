@@ -2511,6 +2511,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         mGlobalActionsFactory = injector.getGlobalActionsFactory();
         mLockPatternUtils = new LockPatternUtils(mContext);
         mLogger = new MetricsLogger();
+        mLineageHardware = LineageHardwareManager.getInstance(mContext);
 
         Resources res = mContext.getResources();
         mWakeOnDpadKeyPress =
@@ -7078,7 +7079,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             mVrManagerInternal.addPersistentVrModeStateListener(mPersistentVrModeListener);
         }
 
-        mLineageHardware = LineageHardwareManager.getInstance(mContext);
         // Ensure observe happens in systemReady() since we need
         // LineageHardwareService to be up and running
         mSettingsObserver.observe();
