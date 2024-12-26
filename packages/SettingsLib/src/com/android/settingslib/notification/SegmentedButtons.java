@@ -29,7 +29,7 @@ import com.android.settingslib.R;
 
 import java.util.Objects;
 
-class SegmentedButtons extends LinearLayout {
+public class SegmentedButtons extends LinearLayout {
     //private static final int LABEL_RES_KEY = R.id.label;
     private static final Typeface REGULAR = Typeface.create("sans-serif", Typeface.NORMAL);
     private static final Typeface MEDIUM = Typeface.create("sans-serif-medium", Typeface.NORMAL);

@@ -47,6 +47,7 @@ import androidx.annotation.Nullable;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.policy.PhoneWindow;
 import com.android.settingslib.R;
+import com.android.settingslib.notification.SegmentedButtons;
 
 import java.util.Arrays;
 import java.util.Calendar;
