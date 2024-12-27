@@ -43,7 +43,6 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.UserManager;
 import android.provider.Settings;
-import android.service.dreams.IDreamManager;
 import android.telecom.TelecomManager;
 import android.transition.AutoTransition;
 import android.transition.TransitionManager;
@@ -179,7 +178,6 @@ public class GlobalActionsDialog extends GlobalActionsDialogLite
             Context context,
             GlobalActionsManager windowManagerFuncs,
             AudioManager audioManager,
-            IDreamManager iDreamManager,
             DevicePolicyManager devicePolicyManager,
             LockPatternUtils lockPatternUtils,
             BroadcastDispatcher broadcastDispatcher,
@@ -217,7 +215,6 @@ public class GlobalActionsDialog extends GlobalActionsDialogLite
         super(context,
                 windowManagerFuncs,
                 audioManager,
-                iDreamManager,
                 devicePolicyManager,
                 lockPatternUtils,
                 broadcastDispatcher,
