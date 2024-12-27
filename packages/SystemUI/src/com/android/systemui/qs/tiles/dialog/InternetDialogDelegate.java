@@ -319,7 +319,6 @@ public class InternetDialogDelegate implements
         mInternetDialogTitle.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
         mBackgroundOff = context.getDrawable(R.drawable.internet_dialog_selected_effect);
         setOnClickListener(dialog);
-        setHotspotLayout();
         mTurnWifiOnLayout.setBackground(null);
         mAirplaneModeButton.setVisibility(
                 mInternetDialogController.isAirplaneModeEnabled() ? View.VISIBLE : View.GONE);
@@ -1104,7 +1103,7 @@ public class InternetDialogDelegate implements
         boolean mShouldUpdateHotspot = false;
         boolean mIsHotspotAvailable = false;
         boolean mIsHotspotEnabled = false;
-        int mIsHotspotTransient = false;
+        boolean mIsHotspotTransient = false;
         int mHotspotNumDevices = 0;
         boolean mIsDataSaverEnabled = false;
     }
