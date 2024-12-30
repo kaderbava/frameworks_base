@@ -38,6 +38,7 @@ import com.android.systemui.qs.footer.foregroundServicesRepository
 import com.android.systemui.qs.footer.ui.viewmodel.FooterActionsViewModel
 import com.android.systemui.security.data.repository.securityRepository
 import com.android.systemui.settings.userTracker
+import com.android.systemui.statusbar.policy.KeyguardStateController
 import com.android.systemui.statusbar.policy.deviceProvisionedController
 import com.android.systemui.statusbar.policy.securityController
 import com.android.systemui.user.data.repository.userSwitcherRepository
@@ -72,6 +73,8 @@ val Kosmos.qsSecurityFooterUtils by Fixture {
     )
 }
 
+val Kosmos.keyguardStateController by Fixture { mock<KeyguardStateController>() }
+
 val Kosmos.footerActionsInteractor by Fixture {
     FooterActionsInteractorImpl(
         activityStarter = activityStarter,
@@ -86,6 +89,7 @@ val Kosmos.footerActionsInteractor by Fixture {
         userSwitcherRepository = userSwitcherRepository,
         broadcastDispatcher = broadcastDispatcher,
         bgDispatcher = testDispatcher,
+        keyguardStateController = keyguardStateController,
     )
 }
 
