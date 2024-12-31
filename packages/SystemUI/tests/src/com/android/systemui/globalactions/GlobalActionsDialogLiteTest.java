@@ -43,7 +43,6 @@ import android.media.AudioManager;
 import android.os.Handler;
 import android.os.UserManager;
 import android.provider.Settings;
-import android.service.dreams.IDreamManager;
 import android.testing.TestableLooper;
 import android.view.GestureDetector;
 import android.view.IWindowManager;
@@ -108,7 +107,6 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
 
     @Mock private GlobalActions.GlobalActionsManager mWindowManagerFuncs;
     @Mock private AudioManager mAudioManager;
-    @Mock private IDreamManager mDreamManager;
     @Mock private DevicePolicyManager mDevicePolicyManager;
     @Mock private LockPatternUtils mLockPatternUtils;
     @Mock private BroadcastDispatcher mBroadcastDispatcher;
@@ -167,7 +165,6 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
         mGlobalActionsDialogLite = new GlobalActionsDialogLite(mContext,
                 mWindowManagerFuncs,
                 mAudioManager,
-                mDreamManager,
                 mDevicePolicyManager,
                 mLockPatternUtils,
                 mBroadcastDispatcher,

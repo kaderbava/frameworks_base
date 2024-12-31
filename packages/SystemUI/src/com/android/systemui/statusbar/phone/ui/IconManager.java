@@ -29,10 +29,10 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
 
-import androidx.annotation.VisibleForTesting;
-
 import com.android.internal.statusbar.StatusBarIcon;
+import com.android.internal.statusbar.StatusBarIcon.Shape;
 import com.android.systemui.demomode.DemoModeCommandReceiver;
+import com.android.systemui.modes.shared.ModesUiIcons;
 import com.android.systemui.res.R;
 import com.android.systemui.statusbar.BaseStatusBarFrameLayout;
 import com.android.systemui.statusbar.StatusBarIconView;
@@ -160,12 +160,11 @@ public class IconManager implements DemoModeCommandReceiver {
         };
     }
 
-    @VisibleForTesting
     protected StatusBarIconView addIcon(int index, String slot, boolean blocked,
             StatusBarIcon icon) {
         StatusBarIconView view = onCreateStatusBarIconView(slot, blocked);
         view.set(icon);
-        mGroup.addView(view, index, onCreateLayoutParams());
+        mGroup.addView(view, index, onCreateLayoutParams(icon.shape));
         return view;
     }
 
@@ -185,7 +184,7 @@ public class IconManager implements DemoModeCommandReceiver {
             int index) {
         mBindableIcons.put(holder.getSlot(), holder);
         ModernStatusBarView view = holder.getInitializer().createAndBind(mContext);
-        mGroup.addView(view, index, onCreateLayoutParams());
+        mGroup.addView(view, index, onCreateLayoutParams(Shape.WRAP_CONTENT));
         if (mIsInDemoMode) {
             mDemoStatusIcons.addBindableIcon(holder);
         }
@@ -194,7 +193,7 @@ public class IconManager implements DemoModeCommandReceiver {
 
     protected StatusIconDisplayable addNewWifiIcon(int index, String slot) {
         ModernStatusBarWifiView view = onCreateModernStatusBarWifiView(slot);
-        mGroup.addView(view, index, onCreateLayoutParams());
+        mGroup.addView(view, index, onCreateLayoutParams(Shape.WRAP_CONTENT));
 
         if (mIsInDemoMode) {
             mDemoStatusIcons.addModernWifiView(mWifiViewModel);
@@ -210,7 +209,7 @@ public class IconManager implements DemoModeCommandReceiver {
             int subId
     ) {
         BaseStatusBarFrameLayout view = onCreateModernStatusBarMobileView(slot, subId);
-        mGroup.addView(view, index, onCreateLayoutParams());
+        mGroup.addView(view, index, onCreateLayoutParams(Shape.WRAP_CONTENT));
 
         if (mIsInDemoMode) {
             Context mobileContext = mMobileContextProvider
@@ -251,8 +250,12 @@ public class IconManager implements DemoModeCommandReceiver {
                 );
     }
 
-    protected LinearLayout.LayoutParams onCreateLayoutParams() {
-        return new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, mIconSize);
+    protected LinearLayout.LayoutParams onCreateLayoutParams(Shape shape) {
+        int width = ModesUiIcons.isEnabled() && shape == StatusBarIcon.Shape.FIXED_SPACE
+                ? mIconSize
+                : ViewGroup.LayoutParams.WRAP_CONTENT;
+
+        return new LinearLayout.LayoutParams(width, mIconSize);
     }
 
     protected void destroy() {
@@ -273,10 +276,15 @@ public class IconManager implements DemoModeCommandReceiver {
 
     /** Called once an icon has been set. */
     public void onSetIcon(int viewIndex, StatusBarIcon icon) {
-        View view = mGroup.getChildAt(viewIndex);
-        if (view instanceof StatusBarIconView) {
-            ((StatusBarIconView) view).set(icon);
+        StatusBarIconView view = (StatusBarIconView) mGroup.getChildAt(viewIndex);
+        if (ModesUiIcons.isEnabled()) {
+            ViewGroup.LayoutParams current = view.getLayoutParams();
+            ViewGroup.LayoutParams desired = onCreateLayoutParams(icon.shape);
+            if (desired.width != current.width || desired.height != current.height) {
+                view.setLayoutParams(desired);
+            }
         }
+        view.set(icon);
     }
 
     /** Called once an icon holder has been set. */

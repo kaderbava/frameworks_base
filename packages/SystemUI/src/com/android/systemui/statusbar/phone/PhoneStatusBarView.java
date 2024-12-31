@@ -16,9 +16,6 @@
 
 package com.android.systemui.statusbar.phone;
 
-
-import static com.android.systemui.Flags.truncatedStatusBarIconsFix;
-
 import android.annotation.Nullable;
 import android.content.Context;
 import android.content.res.Configuration;
@@ -43,19 +40,19 @@ import android.view.accessibility.AccessibilityEvent;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 
+import androidx.annotation.NonNull;
+
 import com.android.internal.policy.SystemBarUtils;
 import com.android.settingslib.Utils;
 import com.android.systemui.Dependency;
+import com.android.systemui.Flags;
 import com.android.systemui.Gefingerpoken;
-import com.android.systemui.plugins.DarkIconDispatcher;
-import com.android.systemui.plugins.DarkIconDispatcher.DarkReceiver;
 import com.android.systemui.res.R;
 import com.android.systemui.shared.rotation.FloatingRotationButton;
 import com.android.systemui.shared.rotation.RotationButtonController;
 import com.android.systemui.statusbar.CommandQueue;
 import com.android.systemui.statusbar.CommandQueue.Callbacks;
 import com.android.systemui.statusbar.phone.userswitcher.StatusBarUserSwitcherContainer;
-import com.android.systemui.statusbar.policy.Clock;
 import com.android.systemui.statusbar.window.StatusBarWindowController;
 import com.android.systemui.user.ui.binder.StatusBarUserChipViewBinder;
 import com.android.systemui.user.ui.viewmodel.StatusBarUserChipViewModel;
@@ -66,11 +63,8 @@ import java.util.Objects;
 public class PhoneStatusBarView extends FrameLayout implements Callbacks {
     private static final String TAG = "PhoneStatusBarView";
     private final CommandQueue mCommandQueue;
-    private final StatusBarContentInsetsProvider mContentInsetsProvider;
     private final StatusBarWindowController mStatusBarWindowController;
 
-    private DarkReceiver mBattery;
-    private ClockController mClockController;
     private int mRotationOrientation = -1;
     private RotationButtonController mRotationButtonController;
     @Nullable
@@ -82,6 +76,10 @@ public class PhoneStatusBarView extends FrameLayout implements Callbacks {
     private int mStatusBarHeight;
     @Nullable
     private Gefingerpoken mTouchEventHandler;
+    @Nullable
+    private HasCornerCutoutFetcher mHasCornerCutoutFetcher;
+    @Nullable
+    private InsetsFetcher mInsetsFetcher;
     private int mDensity;
     private float mFontScale;
 
@@ -93,7 +91,6 @@ public class PhoneStatusBarView extends FrameLayout implements Callbacks {
     public PhoneStatusBarView(Context context, AttributeSet attrs) {
         super(context, attrs);
         mCommandQueue = Dependency.get(CommandQueue.class);
-        mContentInsetsProvider = Dependency.get(StatusBarContentInsetsProvider.class);
         mStatusBarWindowController = Dependency.get(StatusBarWindowController.class);
 
         // Only create FRB here if there is no navbar
@@ -145,6 +142,16 @@ public class PhoneStatusBarView extends FrameLayout implements Callbacks {
         mTouchEventHandler = handler;
     }
 
+    void setHasCornerCutoutFetcher(@NonNull HasCornerCutoutFetcher cornerCutoutFetcher) {
+        mHasCornerCutoutFetcher = cornerCutoutFetcher;
+        updateCutoutLocation();
+    }
+
+    void setInsetsFetcher(@NonNull InsetsFetcher insetsFetcher) {
+        mInsetsFetcher = insetsFetcher;
+        updateSafeInsets();
+    }
+
     void init(StatusBarUserChipViewModel viewModel) {
         StatusBarUserSwitcherContainer container = findViewById(R.id.user_switcher_container);
         StatusBarUserChipViewBinder.bind(container, viewModel);
@@ -153,8 +160,6 @@ public class PhoneStatusBarView extends FrameLayout implements Callbacks {
     @Override
     public void onFinishInflate() {
         super.onFinishInflate();
-        mBattery = findViewById(R.id.battery);
-        mClockController = new ClockController(getContext(), this);
         mCutoutSpace = findViewById(R.id.cutout_space_view);
 
         updateResources();
@@ -163,14 +168,9 @@ public class PhoneStatusBarView extends FrameLayout implements Callbacks {
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
-        // Always have Battery meters in the status bar observe the dark/light modes.
-        Dependency.get(DarkIconDispatcher.class).addDarkReceiver(mBattery);
-        mClockController.addDarkReceiver();
         if (updateDisplayParameters()) {
             updateLayoutForCutout();
-            if (truncatedStatusBarIconsFix()) {
-                updateWindowHeight();
-            }
+            updateWindowHeight();
         }
 
         if (mRotationButtonController != null && !hasNavigationBar()) {
@@ -181,8 +181,6 @@ public class PhoneStatusBarView extends FrameLayout implements Callbacks {
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
-        Dependency.get(DarkIconDispatcher.class).removeDarkReceiver(mBattery);
-        mClockController.removeDarkReceiver();
         mDisplayCutout = null;
 
         if (mRotationButtonController != null) {
@@ -203,13 +201,7 @@ public class PhoneStatusBarView extends FrameLayout implements Callbacks {
             updateLayoutForCutout();
             requestLayout();
         }
-        if (truncatedStatusBarIconsFix()) {
-            updateWindowHeight();
-        }
-    }
-
-    void onDensityOrFontScaleChanged() {
-        mClockController.onDensityOrFontScaleChanged();
+        updateWindowHeight();
     }
 
     @Override
@@ -290,8 +282,12 @@ public class PhoneStatusBarView extends FrameLayout implements Callbacks {
 
     @Override
     public boolean onInterceptTouchEvent(MotionEvent event) {
-        mTouchEventHandler.onInterceptTouchEvent(event);
-        return super.onInterceptTouchEvent(event);
+        if (Flags.statusBarSwipeOverChip()) {
+            return mTouchEventHandler.onInterceptTouchEvent(event);
+        } else {
+            mTouchEventHandler.onInterceptTouchEvent(event);
+            return super.onInterceptTouchEvent(event);
+        }
     }
 
     @Override
@@ -365,7 +361,14 @@ public class PhoneStatusBarView extends FrameLayout implements Callbacks {
             return;
         }
 
-        boolean hasCornerCutout = mContentInsetsProvider.currentRotationHasCornerCutout();
+        boolean hasCornerCutout;
+        if (mHasCornerCutoutFetcher != null) {
+            hasCornerCutout = mHasCornerCutoutFetcher.fetchHasCornerCutout();
+        } else {
+            Log.e(TAG, "mHasCornerCutoutFetcher unexpectedly null");
+            hasCornerCutout = true;
+        }
+
         if (mDisplayCutout == null || mDisplayCutout.isEmpty() || hasCornerCutout) {
             mCutoutSpace.setVisibility(View.GONE);
             return;
@@ -383,8 +386,12 @@ public class PhoneStatusBarView extends FrameLayout implements Callbacks {
     }
 
     private void updateSafeInsets() {
-        Insets insets = mContentInsetsProvider
-                .getStatusBarContentInsetsForCurrentRotation();
+        if (mInsetsFetcher == null) {
+            Log.e(TAG, "mInsetsFetcher unexpectedly null");
+            return;
+        }
+
+        Insets insets  = mInsetsFetcher.fetchInsets();
         setPadding(
                 insets.left,
                 insets.top,
@@ -406,6 +413,17 @@ public class PhoneStatusBarView extends FrameLayout implements Callbacks {
     }
 
     private void updateWindowHeight() {
+        if (Flags.statusBarStopUpdatingWindowHeight()) {
+            return;
+        }
         mStatusBarWindowController.refreshStatusBarHeight();
+    }
+
+    interface HasCornerCutoutFetcher {
+        boolean fetchHasCornerCutout();
+    }
+
+    interface InsetsFetcher {
+        Insets fetchInsets();
     }
 }

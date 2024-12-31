@@ -15,6 +15,8 @@
  */
 package com.android.server.display.brightness.strategy;
 
+import static android.hardware.display.DisplayManagerInternal.DisplayPowerRequest.POLICY_DOZE;
+
 import android.annotation.Nullable;
 import android.content.Context;
 import android.hardware.display.BrightnessConfiguration;
@@ -109,15 +111,21 @@ public class AutomaticBrightnessStrategy2 {
      */
     public void setAutoBrightnessState(int targetDisplayState,
             boolean allowAutoBrightnessWhileDozingConfig, int brightnessReason, int policy,
-            float lastUserSetScreenBrightness, boolean userSetBrightnessChanged) {
-        final boolean autoBrightnessEnabledInDoze =
-                allowAutoBrightnessWhileDozingConfig && Display.isDozeState(targetDisplayState);
+            boolean useNormalBrightnessForDoze, float lastUserSetScreenBrightness,
+            boolean userSetBrightnessChanged) {
+        // If the policy is POLICY_DOZE and the display state is not STATE_OFF, auto-brightness
+        // should only be enabled if the config allows it
+        final boolean autoBrightnessEnabledInDoze = allowAutoBrightnessWhileDozingConfig
+                && policy == POLICY_DOZE && targetDisplayState != Display.STATE_OFF;
+
         mIsAutoBrightnessEnabled = shouldUseAutoBrightness()
-                && (targetDisplayState == Display.STATE_ON || autoBrightnessEnabledInDoze)
+                && ((targetDisplayState == Display.STATE_ON && policy != POLICY_DOZE)
+                || autoBrightnessEnabledInDoze)
                 && brightnessReason != BrightnessReason.REASON_OVERRIDE
                 && mAutomaticBrightnessController != null;
         mAutoBrightnessDisabledDueToDisplayOff = shouldUseAutoBrightness()
-                && !(targetDisplayState == Display.STATE_ON || autoBrightnessEnabledInDoze);
+                && !((targetDisplayState == Display.STATE_ON && policy != POLICY_DOZE)
+                || autoBrightnessEnabledInDoze);
         final int autoBrightnessState = mIsAutoBrightnessEnabled
                 && brightnessReason != BrightnessReason.REASON_FOLLOWER
                 ? AutomaticBrightnessController.AUTO_BRIGHTNESS_ENABLED
@@ -126,7 +134,8 @@ public class AutomaticBrightnessStrategy2 {
                         : AutomaticBrightnessController.AUTO_BRIGHTNESS_DISABLED;
 
         accommodateUserBrightnessChanges(userSetBrightnessChanged, lastUserSetScreenBrightness,
-                policy, targetDisplayState, mBrightnessConfiguration, autoBrightnessState);
+                policy, targetDisplayState, useNormalBrightnessForDoze, mBrightnessConfiguration,
+                autoBrightnessState);
     }
 
     public boolean isAutoBrightnessEnabled() {
@@ -367,7 +376,8 @@ public class AutomaticBrightnessStrategy2 {
     @VisibleForTesting
     void accommodateUserBrightnessChanges(boolean userSetBrightnessChanged,
             float lastUserSetScreenBrightness, int policy, int displayState,
-            BrightnessConfiguration brightnessConfiguration, int autoBrightnessState) {
+            boolean useNormalBrightnessForDoze, BrightnessConfiguration brightnessConfiguration,
+            int autoBrightnessState) {
         // Update the pending auto-brightness adjustments if any. This typically checks and adjusts
         // the state of the class if the user moves the brightness slider and has settled to a
         // different value
@@ -384,8 +394,12 @@ public class AutomaticBrightnessStrategy2 {
                     brightnessConfiguration,
                     lastUserSetScreenBrightness,
                     userSetBrightnessChanged, autoBrightnessAdjustment,
-                    mAutoBrightnessAdjustmentChanged, policy, displayState,
-                    mShouldResetShortTermModel, mAutoBrightnessOneShotEnabled);
+                    mAutoBrightnessAdjustmentChanged,
+                    policy,
+                    displayState,
+                    useNormalBrightnessForDoze,
+                    mShouldResetShortTermModel,
+                    mAutoBrightnessOneShotEnabled);
             mShouldResetShortTermModel = false;
             // We take note if the user brightness point is still being used in the current
             // auto-brightness model.

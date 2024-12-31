@@ -36,6 +36,7 @@ import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.provider.Settings;
 import android.util.DisplayMetrics;
+import android.util.Size;
 import android.view.Display;
 import android.view.DisplayCutout;
 import android.view.DisplayInfo;
@@ -84,6 +85,7 @@ public class DisplayLayout {
     private boolean mHasNavigationBar = false;
     private boolean mHasStatusBar = false;
     private int mNavBarFrameHeight = 0;
+    private int mTaskbarFrameHeight = 0;
     private boolean mAllowSeamlessRotationDespiteNavBarMoving = false;
     private boolean mNavigationBarCanMove = false;
     private boolean mReverseDefaultRotation = false;
@@ -122,6 +124,7 @@ public class DisplayLayout {
                 && mNavigationBarCanMove == other.mNavigationBarCanMove
                 && mReverseDefaultRotation == other.mReverseDefaultRotation
                 && mNavBarFrameHeight == other.mNavBarFrameHeight
+                && mTaskbarFrameHeight == other.mTaskbarFrameHeight
                 && Objects.equals(mInsetsState, other.mInsetsState);
     }
 
@@ -129,7 +132,7 @@ public class DisplayLayout {
     public int hashCode() {
         return Objects.hash(mUiMode, mWidth, mHeight, mCutout, mRotation, mDensityDpi,
                 mNonDecorInsets, mStableInsets, mHasNavigationBar, mHasStatusBar,
-                mNavBarFrameHeight, mAllowSeamlessRotationDespiteNavBarMoving,
+                mNavBarFrameHeight, mTaskbarFrameHeight, mAllowSeamlessRotationDespiteNavBarMoving,
                 mNavigationBarCanMove, mReverseDefaultRotation, mInsetsState);
     }
 
@@ -179,6 +182,7 @@ public class DisplayLayout {
         mNavigationBarCanMove = dl.mNavigationBarCanMove;
         mReverseDefaultRotation = dl.mReverseDefaultRotation;
         mNavBarFrameHeight = dl.mNavBarFrameHeight;
+        mTaskbarFrameHeight = dl.mTaskbarFrameHeight;
         mNonDecorInsets.set(dl.mNonDecorInsets);
         mStableInsets.set(dl.mStableInsets);
         mInsetsState.set(dl.mInsetsState, true /* copySources */);
@@ -217,7 +221,8 @@ public class DisplayLayout {
         if (mHasStatusBar) {
             convertNonDecorInsetsToStableInsets(res, mStableInsets, mCutout, mHasStatusBar);
         }
-        mNavBarFrameHeight = getNavigationBarFrameHeight(res, mWidth > mHeight);
+        mNavBarFrameHeight = getNavigationBarFrameHeight(res, /* landscape */ mWidth > mHeight);
+        mTaskbarFrameHeight = SystemBarUtils.getTaskbarHeight(res);
     }
 
     /**
@@ -239,6 +244,16 @@ public class DisplayLayout {
         if (mCutout != null) {
             mCutout = mCutout.getRotated(origWidth, origHeight, fromRotation, toRotation);
         }
+
+        recalcInsets(res);
+    }
+
+    /**
+     * Update the dimensions of this layout.
+     */
+    public void resizeTo(Resources res, Size displaySize) {
+        mWidth = displaySize.getWidth();
+        mHeight = displaySize.getHeight();
 
         recalcInsets(res);
     }
@@ -322,6 +337,17 @@ public class DisplayLayout {
     public void getStableBounds(Rect outBounds) {
         outBounds.set(0, 0, mWidth, mHeight);
         outBounds.inset(mStableInsets);
+    }
+
+    /** Predicts the calculated stable bounds when in Desktop Mode. */
+    public void getStableBoundsForDesktopMode(Rect outBounds) {
+        getStableBounds(outBounds);
+
+        if (mNavBarFrameHeight != mTaskbarFrameHeight) {
+            // Currently not in pinned taskbar mode, exclude taskbar insets instead of current
+            // navigation insets from bounds.
+            outBounds.bottom = mHeight - mTaskbarFrameHeight;
+        }
     }
 
     /**

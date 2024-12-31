@@ -29,6 +29,7 @@ import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
 import android.database.ContentObserver;
 import android.graphics.PixelFormat;
+import android.graphics.Rect;
 import android.graphics.Region;
 import android.os.Binder;
 import android.os.Build;
@@ -44,13 +45,15 @@ import android.view.IWindowSession;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowInsets;
-import android.view.WindowManager;
 import android.view.WindowManager.LayoutParams;
 import android.view.WindowManagerGlobal;
 
+import com.android.app.viewcapture.ViewCaptureAwareWindowManager;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.systemui.Dumpable;
+import com.android.systemui.Flags;
 import com.android.systemui.biometrics.AuthController;
+import com.android.systemui.bouncer.shared.flag.ComposeBouncerFlags;
 import com.android.systemui.colorextraction.SysuiColorExtractor;
 import com.android.systemui.communal.domain.interactor.CommunalInteractor;
 import com.android.systemui.dagger.SysUISingleton;
@@ -66,6 +69,7 @@ import com.android.systemui.scene.shared.flag.SceneContainerFlag;
 import com.android.systemui.scene.ui.view.WindowRootViewComponent;
 import com.android.systemui.settings.UserTracker;
 import com.android.systemui.shade.domain.interactor.ShadeInteractor;
+import com.android.systemui.shade.ui.viewmodel.NotificationShadeWindowModel;
 import com.android.systemui.statusbar.NotificationShadeWindowController;
 import com.android.systemui.statusbar.StatusBarState;
 import com.android.systemui.statusbar.SysuiStatusBarStateController;
@@ -106,7 +110,7 @@ public class NotificationShadeWindowControllerImpl implements NotificationShadeW
 
     private final Context mContext;
     private final WindowRootViewComponent.Factory mWindowRootViewComponentFactory;
-    private final WindowManager mWindowManager;
+    private final ViewCaptureAwareWindowManager mWindowManager;
     private final IActivityManager mActivityManager;
     private final DozeParameters mDozeParameters;
     private final KeyguardStateController mKeyguardStateController;
@@ -135,6 +139,7 @@ public class NotificationShadeWindowControllerImpl implements NotificationShadeW
             mCallbacks = new ArrayList<>();
 
     private final SysuiColorExtractor mColorExtractor;
+    private final NotificationShadeWindowModel mNotificationShadeWindowModel;
     /**
      * Layout params would be aggregated and dispatched all at once if this is > 0.
      *
@@ -150,7 +155,7 @@ public class NotificationShadeWindowControllerImpl implements NotificationShadeW
     public NotificationShadeWindowControllerImpl(
             Context context,
             WindowRootViewComponent.Factory windowRootViewComponentFactory,
-            WindowManager windowManager,
+            ViewCaptureAwareWindowManager viewCaptureAwareWindowManager,
             IActivityManager activityManager,
             DozeParameters dozeParameters,
             StatusBarStateController statusBarStateController,
@@ -167,10 +172,11 @@ public class NotificationShadeWindowControllerImpl implements NotificationShadeW
             ShadeWindowLogger logger,
             Lazy<SelectedUserInteractor> userInteractor,
             UserTracker userTracker,
+            NotificationShadeWindowModel notificationShadeWindowModel,
             Lazy<CommunalInteractor> communalInteractor) {
         mContext = context;
         mWindowRootViewComponentFactory = windowRootViewComponentFactory;
-        mWindowManager = windowManager;
+        mWindowManager = viewCaptureAwareWindowManager;
         mActivityManager = activityManager;
         mDozeParameters = dozeParameters;
         mKeyguardStateController = keyguardStateController;
@@ -181,6 +187,7 @@ public class NotificationShadeWindowControllerImpl implements NotificationShadeW
         mKeyguardBypassController = keyguardBypassController;
         mBackgroundExecutor = backgroundExecutor;
         mColorExtractor = colorExtractor;
+        mNotificationShadeWindowModel = notificationShadeWindowModel;
         // prefix with {slow} to make sure this dumps at the END of the critical section.
         dumpManager.registerCriticalDumpable("{slow}NotificationShadeWindowControllerImpl", this);
         mAuthController = authController;
@@ -347,6 +354,20 @@ public class NotificationShadeWindowControllerImpl implements NotificationShadeW
                 mCommunalInteractor.get().isCommunalVisible(),
                 this::onCommunalVisibleChanged
         );
+
+        if (!SceneContainerFlag.isEnabled() && Flags.useTransitionsForKeyguardOccluded()) {
+            collectFlow(
+                    mWindowRootView,
+                    mNotificationShadeWindowModel.isKeyguardOccluded(),
+                    this::setKeyguardOccluded
+            );
+        }
+        if (ComposeBouncerFlags.INSTANCE.isComposeBouncerOrSceneContainerEnabled()) {
+            collectFlow(mWindowRootView, mNotificationShadeWindowModel.isBouncerShowing(),
+                    this::setBouncerShowing);
+            collectFlow(mWindowRootView, mNotificationShadeWindowModel.getDoesBouncerRequireIme(),
+                    this::setKeyguardNeedsInput);
+        }
     }
 
     @Override
@@ -357,6 +378,11 @@ public class NotificationShadeWindowControllerImpl implements NotificationShadeW
     @Override
     public void setDozeScreenBrightness(int value) {
         mScreenBrightnessDoze = value / 255f;
+    }
+
+    @Override
+    public void setDozeScreenBrightnessFloat(float value) {
+        mScreenBrightnessDoze = value;
     }
 
     private void setKeyguardDark(boolean dark) {
@@ -662,7 +688,8 @@ public class NotificationShadeWindowControllerImpl implements NotificationShadeW
                     mCurrentState.bouncerShowing,
                     mCurrentState.dozing,
                     mCurrentState.shadeOrQsExpanded,
-                    mCurrentState.dreaming);
+                    mCurrentState.dreaming,
+                    mCurrentState.communalVisible);
         }
     }
 
@@ -979,6 +1006,19 @@ public class NotificationShadeWindowControllerImpl implements NotificationShadeW
 
     @Override
     public void onConfigChanged(Configuration newConfig) {
+        // If the shade window is not visible, the bounds will not update until it becomes visible.
+        // Touches that should invoke shade expansion but are not within those incorrect bounds
+        // (because the shape of the shade window remains portrait after flipping to landscape) will
+        // be dropped, causing the shade expansion to fail silently. Since the shade doesn't open,
+        // it doesn't become visible, and the bounds will never update. Therefore, we must detect
+        // the incorrect bounds here and force the update so that touches are routed correctly.
+        if (SceneContainerFlag.isEnabled() && mWindowRootView.getVisibility() == View.INVISIBLE) {
+            Rect bounds = newConfig.windowConfiguration.getBounds();
+            if (mWindowRootView.getWidth() != bounds.width()) {
+                mLogger.logConfigChangeWidthAdjust(mWindowRootView.getWidth(), bounds.width());
+                updateRootViewBounds(bounds);
+            }
+        }
         final boolean newScreenRotationAllowed = mKeyguardStateController
                 .isKeyguardScreenRotationAllowed();
 
@@ -986,6 +1026,16 @@ public class NotificationShadeWindowControllerImpl implements NotificationShadeW
             apply(mCurrentState);
             mLastKeyguardRotationAllowed = newScreenRotationAllowed;
         }
+    }
+
+    private void updateRootViewBounds(Rect bounds) {
+        int originalMlpWidth = mLp.width;
+        int originalMlpHeight = mLp.height;
+        mLp.width = bounds.width();
+        mLp.height = bounds.height();
+        mWindowManager.updateViewLayout(mWindowRootView, mLp);
+        mLp.width = originalMlpWidth;
+        mLp.height = originalMlpHeight;
     }
 
     /**
