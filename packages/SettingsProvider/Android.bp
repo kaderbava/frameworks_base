@@ -31,7 +31,7 @@ android_library {
         "telephony-common",
         "ims-common",
         "unsupportedappusage",
-        "framework-derpfest",
+        "framework-derpfest.impl",
     ],
     static_libs: [
         "aconfig_device_paths_java",
